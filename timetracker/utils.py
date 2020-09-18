@@ -89,3 +89,17 @@ def get_processes(process_names):
             pass
 
     return processes
+
+
+def get_all_processes():
+    """Returns a dict of the process name to the psutil.Process"""
+    processes = {}
+    for proc in psutil.process_iter():
+        try:
+            proc_name = proc.name()
+            processes[proc_name] = proc
+
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            pass
+
+    return processes

@@ -23,4 +23,27 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-# TODO: this
+import os
+import json
+
+import logging
+
+
+log = logging.getLogger("timetracker.updater")
+log.setLevel(logging.INFO)
+log.addHandler(logging.StreamHandler())
+
+
+# check if a data folder exists
+if not os.path.exists("data"):
+    log.info("data dir not found, creating")
+    os.makedirs("data")
+
+# TODO: make more things that you can configure (theme for example)
+default_config = {"mouse_timeout": 10}
+
+# check if a data/config file exists
+if not os.path.isfile("data/config.json"):
+    log.info("config file not found, creating")
+    with open("data/config.json", "w") as f:
+        json.dump(default_config, f, indent=4, sort_keys=True)

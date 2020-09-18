@@ -92,7 +92,7 @@ class TimeEntry(Base):
             session.query(TimeEntry)
             .filter_by(end_datetime=None)
             .order_by(TimeEntry.end_datetime.desc())
-        )
+        ).all()
 
         for entry in entries:
             session.remove(entry)

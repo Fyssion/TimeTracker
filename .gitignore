@@ -1,3 +1,7 @@
+# Project stuff
+data/
+instance_lock.txt
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
