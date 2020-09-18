@@ -1,0 +1,3 @@
+sqlalchemy
+psutil
+pywin32
