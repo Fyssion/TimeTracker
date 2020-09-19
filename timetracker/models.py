@@ -64,6 +64,9 @@ class TimeEntry(Base):
     start_datetime = Column(DateTime)
     end_datetime = Column(DateTime)
 
+    def __repr__(self):
+        return f"<TimeEntry(program_id='{self.program_id}', start_datetime='{self.start_datetime}', end_datetime='{self.end_datetime}')>"
+
     @staticmethod
     def start_logging(program_id):
         """Creates a time entry with the program id and the start time"""
@@ -95,7 +98,7 @@ class TimeEntry(Base):
         ).all()
 
         for entry in entries:
-            session.remove(entry)
+            session.delete(entry)
 
         session.commit()
 

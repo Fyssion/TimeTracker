@@ -24,6 +24,8 @@ SOFTWARE.
 
 
 import tkinter as tk
+from tkinter import ttk
+import tkinter.font as tk_font
 import os
 import json
 import datetime
@@ -31,7 +33,8 @@ import argparse
 import logging
 import time
 import threading
-import Queue
+import queue
+import sys
 
 import psutil
 from pynput import mouse, keyboard
@@ -45,40 +48,34 @@ log.setLevel(logging.INFO)
 log.addHandler(logging.StreamHandler())
 
 
-class ProgramTimeDisplay(tk.StringVar):
-    """A counting stopwatch of time"""
-
-    def __init__(self, timedelta, current_time):
-        tk.StringVar.__init__(self)
-        self.timedelta = timedelta
-        self.current_time = current_time
-
-    def update_time(self):
-        """Update the time using """
-        since = datetime.datetime.utcnow() - self.current_time
-        final_timedelta = self.timedelta + since
-        self.set(
-            f"{final_timedelta.hours:02d}:{final_timedelta.minutes:02d}:{final_timedelta.seconds:02d}"
-        )
-
-
 class AddProgramDisplay(tk.Toplevel):
+    """A popup that lets you add a new program to track"""
     def __init__(self, master=None):
         tk.Toplevel.__init__(self, master)
 
         self.title("Add a Program")
 
+        # name your program text
         name_text = tk.Message(self, text="Name your program")
         name_text.pack()
 
+        # entry box for the program name
+        # TODO: possibly make this autofill when a program is selected from
+        # the dropdown
         name_entry = tk.Entry(self)
         name_entry.pack()
 
+        # get a list of all processes running
+        # FIXME: THIS TAKES FOREVER!!! ALSO IT SHOWS EVERY SINGLE PROCESS!!
+        # TODO: make this only show open windows (without taking a century)
         self.program_dict = program_dict = utils.get_all_processes()
-        dropdown_var = tk.StringVar()
-        dropdown_var.set(program_dict.keys()[0])
+        sorted_keys = list(sorted(program_dict.keys(), key=lambda x: x.lower()))
 
-        dropdown = tk.OptionMenu(self, dropdown_var, *program_dict.keys())
+        # make the dropdown
+        dropdown_var = tk.StringVar()
+        dropdown_var.set(sorted_keys[0])
+
+        dropdown = ttk.Combobox(self, textvariable=dropdown_var, values=sorted_keys)
         dropdown.pack()
 
         save_button = tk.Button(self, text="Save", command=self.save_to_db)
@@ -102,6 +99,37 @@ class AddProgramDisplay(tk.Toplevel):
         self.destroy()
 
 
+class ProgramTimeDisplay(tk.StringVar):
+    """A StringVar that displays the current timer time"""
+
+    def __init__(self, timedelta, current_time):
+        tk.StringVar.__init__(self)
+        self.timedelta = timedelta
+        self.current_time = current_time
+
+    def update_attrs(self, timedelta, current_time):
+        """Easy way to update attrs from MainDisplay.calculate_timedelta"""
+        self.timedelta = timedelta
+        self.current_time = current_time
+
+    def update_time(self):
+        """Update itself to the most recent time"""
+        if not self.current_time:
+            final_timedelta = self.timedelta
+
+        else:
+            since = datetime.datetime.utcnow() - self.current_time
+            final_timedelta = self.timedelta + since
+
+        hours = final_timedelta.seconds // 3600
+        minutes = (final_timedelta.seconds // 60) % 60
+        seconds = final_timedelta.seconds - (minutes * 60) - (hours * 3600)
+
+        self.set(
+            f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+        )
+
+
 class MainDisplay(tk.Frame):
     """Main display that greets the user upon opening
 
@@ -111,9 +139,10 @@ class MainDisplay(tk.Frame):
     def __init__(self, master):
         tk.Frame.__init__(self, master)
 
-        entries = []
         self.last_checked = None
-        self.get_todays_time_entries()
+        entries = self.get_todays_time_entries()
+        self.is_paused = True
+        self.counting_program_id = None
 
         self.status = tk.StringVar()
         self.status.set(
@@ -128,24 +157,29 @@ class MainDisplay(tk.Frame):
         self.status_label["textvariable"] = self.status
 
         self.main_time = ProgramTimeDisplay(*self.calculate_timedelta(entries))
+        self.main_time.update_time()
 
         # Create main counter label
+        counter_font = tk_font.Font(size=20)
         self.main_counter_label = tk.Label(self)
         self.main_counter_label.grid(column=0, row=1, sticky=tk.W)
+        self.main_counter_label.configure(font=counter_font)
         self.main_counter_label["textvariable"] = self.main_time
 
         # Add Program button
         self.add_program_button = tk.Button(
             self, text="Add Program", command=self.add_program
         )
-        self.add_program_button.grid(column=1, row=0, sticky=tk.W)
+        self.add_program_button.grid(column=0, row=2, sticky=tk.W)
 
         # Quit button
         self.quit_button = tk.Button(self, text="Quit", command=master.master.destroy)
-        self.quit_button.grid(column=1, row=1, sticky=tk.W)
+        self.quit_button.grid(column=1, row=2, sticky=tk.W)
 
         for child in self.winfo_children():
             child.grid_configure(padx=20, pady=20)
+
+        self.counter_loop()
 
     def add_program(self):
         """Opens a new window where you can add a program to track"""
@@ -166,7 +200,7 @@ class MainDisplay(tk.Frame):
             if entry.end_datetime:
                 total_timedelta += entry.end_datetime - entry.start_datetime
 
-            elif i == len(entries) - 1:
+            elif i == 0:
                 current_time = entry.start_datetime
 
         return total_timedelta, current_time
@@ -190,8 +224,48 @@ class MainDisplay(tk.Frame):
             .order_by(TimeEntry.end_datetime.desc())
         ).all()
 
-        self.entries = entries
         self.last_checked = datetime.datetime.utcnow()
+
+        return entries
+
+    def counter_loop(self):
+        """Loop that counts up the counter"""
+
+        # if the counter is paused and the current program doesn't exist,
+        # then just keep being paused because nothing has changed
+        if self.is_paused and self.master.current_program:
+            entries = self.get_todays_time_entries()
+            self.main_time.update_attrs(*self.calculate_timedelta(entries))
+            self.main_time.update_time()
+            self.counting_program_id = self.master.current_program.id
+            self.is_paused = False
+            self.status.set(f"Tracking {self.master.current_program.name}")
+
+        # if the counter isn't paused and the current program doesn't exist,
+        # then the logging and stopped and the counter should too
+        elif not self.is_paused and not self.master.current_program:
+            entries = self.get_todays_time_entries()
+            self.main_time.update_attrs(*self.calculate_timedelta(entries))
+            self.main_time.update_time()
+            self.is_paused = True
+            self.counting_program_id = None
+            self.status.set(f"Currently Paused")
+
+        # if the counter isn't paused and the current program matches the program we're currently
+        # counting, then just update the time again because nothing has changed
+        elif not self.is_paused and self.master.current_program.id == self.counting_program_id:
+            self.main_time.update_time()
+
+        # finally, if the counter isn't paused and the current program doesn't match
+        # the program we're currently counting, then the program has changed since
+        # the last loop and we need to check the db again
+        elif not self.is_paused and self.master.current_program.id != self.counting_program_id:
+            entries = self.get_todays_time_entries()
+            self.main_time.update_attrs(*self.calculate_timedelta(entries))
+            self.main_time.update_time()
+            self.counting_program_id = self.master.current_program.id
+
+        self.after(1000, self.counter_loop)
 
 
 class Application(tk.Frame):
@@ -244,12 +318,17 @@ class Application(tk.Frame):
         TimeEntry.delete_unfinished_entries()
         log.info("Starting activity loop")
 
-        self.request_queue = Queue.Queue()
-        self.result_queue = Queue.Queue()
+        # create a queue for running functions in the main thread from
+        # other threads
+        self.request_queue = queue.Queue()
+        self.result_queue = queue.Queue()
 
+        # start the queue loop
         self.queue_loop()
 
+        # create the activity loop thread and start it
         self.activity_thread = threading.Thread(target=self.activity_loop)
+        self.activity_thread.daemon = True  # close the thread when the app is destroyed
         self.activity_thread.start()
 
         if not no_gui:
@@ -270,7 +349,7 @@ class Application(tk.Frame):
         """Stop logging a program to the db"""
         TimeEntry.stop_logging(program.id)
 
-    def submit_to_tkinter(self, callable, *args, **kwargs):
+    def submit_to_queue(self, callable, *args, **kwargs):
         """Submit a callable to fun from another thread"""
         self.request_queue.put((callable, args, kwargs))
         return self.result_queue.get()
@@ -279,7 +358,7 @@ class Application(tk.Frame):
         """Loop that runs callables from other threads"""
         try:
             callable, args, kwargs = self.request_queue.get_nowait()
-        except Queue.Empty:
+        except queue.Empty:
             pass
         else:
             retval = callable(*args, **kwargs)
@@ -292,30 +371,36 @@ class Application(tk.Frame):
 
         This loop checks if any of the programs are open, if they are active, and
         whether or not the mouse is active.
+
+        Since it is in run in another thread, all database calls must be
+        submitted to the queue to be run in the main thread.
         """
         while True:
-
             # check immediately if the user is inactive to save on processing time
             time_since = datetime.datetime.utcnow() - self.active_last
-            if time_since.seconds > int(
-                self.config["mouse_timeout"]
-            ):
+            if time_since.seconds > int(self.config["mouse_timeout"]):
                 if self.current_program:
                     log.info(
                         f"It's been {self.config['mouse_timeout']} second since last active, "
                         f"stopping logging program {self.current_program}"
                     )
-                    self.stop_logging_program(self.current_program)
+                    self.submit_to_queue(
+                        self.stop_logging_program, self.current_program
+                    )
                     self.current_program = None
 
                 # just call after here so we don't have to indent again
                 self.after(500, self.activity_loop)
                 return
 
+            # we need to submit this to the queue to run it in the main thread
+            # since it is a call to the db
+            def get_program_names():
+                return {p.process_name: p for p in self.programs}
+
             # if the current program isn't set, check if one of the programs
             # is an active window
-            # if not self.current_program:
-            program_names = {p.process_name: p for p in self.programs}
+            program_names = self.submit_to_queue(get_program_names)
             processes = utils.get_processes(program_names.keys())
 
             if processes:
@@ -334,7 +419,9 @@ class Application(tk.Frame):
                         log.info(
                             f"Current program {self.current_program} is no longer running, stopping logs"
                         )
-                        self.stop_logging_program(self.current_program)
+                        self.submit_to_queue(
+                            self.stop_logging_program, self.current_program
+                        )
                         self.current_program = None
 
                     # if the current program is set and there's a new active program,
@@ -346,8 +433,10 @@ class Application(tk.Frame):
                             f"but new program {active_program} is. "
                             "stopping old and starting new logs"
                         )
-                        self.stop_logging_program(self.current_program)
-                        self.start_logging_program(active_program)
+                        self.submit_to_queue(
+                            self.stop_logging_program, self.current_program
+                        )
+                        self.submit_to_queue(self.start_logging_program, active_program)
                         self.current_program = active_program
 
                 else:
@@ -355,8 +444,10 @@ class Application(tk.Frame):
                     # just start logging the active program and set the current
                     # program to the active program
                     if active_program:
-                        log.info(f"Current program {active_program} has started, starting logs")
-                        self.start_logging_program(active_program)
+                        log.info(
+                            f"Current program {active_program} has started, starting logs"
+                        )
+                        self.submit_to_queue(self.start_logging_program, active_program)
                         self.current_program = active_program
 
             time.sleep(0.5)
@@ -423,6 +514,7 @@ def main():
         root.withdraw()
     log.info("Starting mainloop")
     root.mainloop()
+    sys.exit()
 
 
 if __name__ == "__main__":
