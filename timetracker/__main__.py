@@ -297,30 +297,6 @@ class Application(tk.Frame):
             with open("data/config.json", "r") as f:
                 self.config = json.load(f)
 
-        # record mouse movement
-        self.active_last = datetime.datetime.utcnow()
-        # master.bind("<Motion>", self.on_activity)
-        # master.bind("<KeyPress>", self.on_activity)
-        # mouse_listener = pynput.mouse.Listener(
-        #     on_move=self.on_activity,
-        #     on_click=self.on_activity,
-        #     on_scroll=self.on_activity,
-        # )
-        # mouse_listener.start()
-
-        self.mouse_movement_thread = threading.Thread(target=utils.mouse_movement_listener, args=(self.on_activity,))
-        self.mouse_movement_thread.daemon = True  # close the thread when the app is destroyed
-        self.mouse_movement_thread.start()
-
-        self.mouse_click_thread = threading.Thread(target=utils.mouse_click_listener, args=(self.on_activity,))
-        self.mouse_click_thread.daemon = True  # close the thread when the app is destroyed
-        self.mouse_click_thread.start()
-
-        kb_listener = pynput.keyboard.Listener(
-            on_press=self.on_activity, on_release=self.on_activity
-        )
-        kb_listener.start()
-
         log.info("Loading programs from db")
         self.load_programs()
 
@@ -387,8 +363,8 @@ class Application(tk.Frame):
         """
         while True:
             # check immediately if the user is inactive to save on processing time
-            time_since = datetime.datetime.utcnow() - self.active_last
-            if time_since.seconds > int(self.config["mouse_timeout"]):
+            time_since = utils.get_idle_time()
+            if time_since > int(self.config["mouse_timeout"]):
                 if self.current_program:
                     log.info(
                         f"It's been {self.config['mouse_timeout']} second since last active, "
@@ -463,10 +439,6 @@ class Application(tk.Frame):
             time.sleep(0.5)
 
         # self.after(500, self.activity_loop)
-
-    def on_activity(self, *args):
-        """Records the last time the user was active (for inactivity tracking)"""
-        self.active_last = datetime.datetime.utcnow()
 
 
 def check_pid():

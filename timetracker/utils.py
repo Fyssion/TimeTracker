@@ -145,3 +145,8 @@ def mouse_click_listener(callback):
             callback()
 
         time.sleep(0.001)
+
+
+def get_idle_time():
+    """Gets the time in seconds since last idle"""
+    return (win32api.GetTickCount() - win32api.GetLastInputInfo()) / 1000.0
