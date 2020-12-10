@@ -375,9 +375,9 @@ class Application(tk.Frame):
                     )
                     self.current_program = None
 
-                # just call after here so we don't have to indent again
-                self.after(500, self.activity_loop)
-                return
+                # doing this here so we can return and not worry about indenting
+                time.sleep(0.5)
+                continue
 
             # we need to submit this to the queue to run it in the main thread
             # since it is a call to the db
