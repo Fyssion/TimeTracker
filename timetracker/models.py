@@ -23,11 +23,18 @@ SOFTWARE.
 """
 
 import datetime
+import os.path
 
 import sqlalchemy
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
+
+
+# need this or program will crash since sqlalchemy
+# doesn't create the folder for me (only the file)
+if not os.path.isdir("data"):
+    os.makedir("data")
 
 
 # Using an SQLite db for logging times
