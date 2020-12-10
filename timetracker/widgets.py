@@ -10,7 +10,7 @@ import utils
 class AddProgramDisplay(tk.Toplevel):
     """A popup that lets you add a new program to track"""
     def __init__(self, master=None):
-        tk.Toplevel.__init__(self, master)
+        tk.TopLevel.__init__(self, master)
 
         self.title("Add a Program")
 
@@ -51,7 +51,12 @@ class AddProgramDisplay(tk.Toplevel):
             return
 
         option = self.dropdown.get()
-        program = self.program_dict[option]
+
+        try:
+            program = self.program_dict[option]
+        except KeyError:
+            # TODO: warning thingy like above
+            return
 
         to_add = Program(name=name, process_name=program.name(), location=program.exe())
         session.add(to_add)
@@ -91,6 +96,26 @@ class ProgramTimeDisplay(tk.StringVar):
         )
 
 
+class ProgramListDisplay(tk.StringVar):
+    """A StingVar that displays the user's list of programs"""
+    def __init__(self):
+        tk.StringVar.__init__(self)
+        self.set("Loading programs...")
+
+    def update_programs(self, programs):
+        """Update the StringVar with a new set of programs"""
+        results = []
+
+        for program in programs:
+            results.append(f"- {program.name} ({program.process_name})")
+
+        if not results:
+            self.set("No programs added. Add one to begin tracking!")
+
+        else:
+            self.set("\n".join(results))
+
+
 class MainDisplay(tk.Frame):
     """Main display that greets the user upon opening
 
@@ -112,39 +137,57 @@ class MainDisplay(tk.Frame):
             else "Currently Paused"
         )
 
+        header_font = tk_font.Font(size=16)
+
+        # == Main counter section ==
+
         # Create status label
-        self.status_label = tk.Label(self)
-        self.status_label.grid(column=0, row=0, sticky=tk.W)
+        self.status_label = tk.Label(self, font=header_font)
+        self.status_label.grid(column=0, row=0, sticky=tk.W, padx=20, pady=5)
         self.status_label["textvariable"] = self.status
 
         self.main_time = ProgramTimeDisplay(*self.calculate_timedelta(entries))
         self.main_time.update_time()
 
         # Create main counter label
-        counter_font = tk_font.Font(size=20)
-        self.main_counter_label = tk.Label(self)
-        self.main_counter_label.grid(column=0, row=1, sticky=tk.W)
-        self.main_counter_label.configure(font=counter_font)
+        self.main_counter_label = tk.Label(self, font=tk_font.Font(size=40))
+        self.main_counter_label.grid(column=0, row=1, sticky=tk.W, padx=20, pady=5)
         self.main_counter_label["textvariable"] = self.main_time
+
+        separator = ttk.Separator(self, orient=tk.HORIZONTAL)
+        separator.grid(column=0, row=2, sticky=(tk.W, tk.E), padx=20)
+
+        # == Programs section ==
+        self.program_header = tk.Label(self, text="Programs", font=header_font)
+        self.program_header.grid(column=0, row=3, sticky=tk.W, padx=20, pady=(10, 2))
+
+        # Actual list of programs
+        self.programs_var = ProgramListDisplay()
+        self.programs_var.update_programs(master.programs)
+
+        self.program_list_label = tk.Label(self, font=tk_font.Font(size=11), justify=tk.LEFT)
+        self.program_list_label.grid(column=0, row=4, sticky=tk.W, padx=20, pady=2)
+        self.program_list_label["textvariable"] = self.programs_var
 
         # Add Program button
         self.add_program_button = tk.Button(
             self, text="Add Program", command=self.add_program
         )
-        self.add_program_button.grid(column=0, row=2, sticky=tk.W)
+        self.add_program_button.grid(column=0, row=5, sticky=tk.W, padx=20, pady=10)
 
         # Quit button
         self.quit_button = tk.Button(self, text="Quit", command=master.master.destroy)
-        self.quit_button.grid(column=1, row=2, sticky=tk.W)
+        self.quit_button.grid(column=1, row=5, sticky=tk.W, padx=20, pady=20)
 
-        for child in self.winfo_children():
-            child.grid_configure(padx=20, pady=20)
+        # for child in self.winfo_children():
+        #     child.grid_configure(padx=20, pady=20)
 
         self.counter_loop()
 
     def add_program(self):
         """Opens a new window where you can add a program to track"""
-        popup = AddProgramDisplay(self)
+        AddProgramDisplay(self)
+        self.programs_var.update_programs(self.master.programs)
 
     def calculate_timedelta(self, all_entries, program_id=None):
         """Calculates a timedelta for a given program or all programs if None is passed"""
@@ -171,7 +214,7 @@ class MainDisplay(tk.Frame):
         today = datetime.datetime.today()
         todays_datetime = datetime.datetime(today.year, today.month, today.day)
         offset = datetime.datetime.now() - datetime.datetime.utcnow()
-        utc_today = todays_datetime + offset
+        utc_today = todays_datetime - offset
 
         # def is_today(entry_time):
         #     UTC_timestamp = float(entry_time.strftime("%s"))
