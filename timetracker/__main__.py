@@ -37,7 +37,7 @@ import queue
 import sys
 
 import psutil
-from pynput import mouse, keyboard
+import pynput
 
 from models import session, Program, TimeEntry
 import utils
@@ -62,8 +62,8 @@ class AddProgramDisplay(tk.Toplevel):
         # entry box for the program name
         # TODO: possibly make this autofill when a program is selected from
         # the dropdown
-        name_entry = tk.Entry(self)
-        name_entry.pack()
+        self.name_entry = tk.Entry(self)
+        self.name_entry.pack()
 
         # get a list of all processes running
         # FIXME: THIS TAKES FOREVER!!! ALSO IT SHOWS EVERY SINGLE PROCESS!!
@@ -75,8 +75,8 @@ class AddProgramDisplay(tk.Toplevel):
         dropdown_var = tk.StringVar()
         dropdown_var.set(sorted_keys[0])
 
-        dropdown = ttk.Combobox(self, textvariable=dropdown_var, values=sorted_keys)
-        dropdown.pack()
+        self.dropdown = ttk.Combobox(self, textvariable=dropdown_var, values=sorted_keys)
+        self.dropdown.pack()
 
         save_button = tk.Button(self, text="Save", command=self.save_to_db)
         save_button.pack()
@@ -299,14 +299,22 @@ class Application(tk.Frame):
         self.active_last = datetime.datetime.utcnow()
         # master.bind("<Motion>", self.on_activity)
         # master.bind("<KeyPress>", self.on_activity)
-        mouse_listener = mouse.Listener(
-            on_move=self.on_activity,
-            on_click=self.on_activity,
-            on_scroll=self.on_activity,
-        )
-        mouse_listener.start()
+        # mouse_listener = pynput.mouse.Listener(
+        #     on_move=self.on_activity,
+        #     on_click=self.on_activity,
+        #     on_scroll=self.on_activity,
+        # )
+        # mouse_listener.start()
 
-        kb_listener = keyboard.Listener(
+        self.mouse_movement_thread = threading.Thread(target=utils.mouse_movement_listener, args=(self.on_activity,))
+        self.mouse_movement_thread.daemon = True  # close the thread when the app is destroyed
+        self.mouse_movement_thread.start()
+
+        self.mouse_click_thread = threading.Thread(target=utils.mouse_click_listener, args=(self.on_activity,))
+        self.mouse_click_thread.daemon = True  # close the thread when the app is destroyed
+        self.mouse_click_thread.start()
+
+        kb_listener = pynput.keyboard.Listener(
             on_press=self.on_activity, on_release=self.on_activity
         )
         kb_listener.start()
