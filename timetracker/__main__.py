@@ -94,7 +94,9 @@ class AddProgramDisplay(tk.Toplevel):
         option = self.dropdown.get()
         program = self.program_dict[option]
 
-        # TODO: save the program to the db
+        to_add = Program(name=name, process_name=program.name(), location=program.exe())
+        session.add(to_add)
+        session.commit
 
         self.destroy()
 
