@@ -28,6 +28,33 @@ import win32gui
 import psutil
 import win32api
 import time
+import os
+
+
+def check_pid():
+    """Checks if another instance of the app is running"""
+    filename = "instance_lock.txt"
+
+    def write_pid():
+        with open(filename, "w") as f:
+            f.write(str(os.getpid()))
+
+    if not os.path.isfile(filename):
+        write_pid()
+        return True
+
+    with open(filename, "r") as f:
+        other_pid = int(f.read())
+
+    try:
+        proc = psutil.Process(other_pid)
+        return proc  # process exists and is running
+
+    except psutil.NoSuchProcess:
+        # process existed but is no longer running
+        # replace old pid with our new one
+        write_pid()
+        return True
 
 
 def top_level_windows(pid):
