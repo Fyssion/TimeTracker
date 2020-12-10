@@ -107,46 +107,6 @@ def get_all_processes():
     return processes
 
 
-def mouse_movement_listener(callback):
-    """Listens for mouse movement and calls the callback when it catches some.
-
-    This is meant to be run in a thread.
-    """
-    savedpos = win32api.GetCursorPos()
-
-    while True:
-        curpos = win32api.GetCursorPos()
-        if savedpos != curpos:
-            savedpos = curpos
-            callback()
-        time.sleep(0.05)
-
-
-def mouse_click_listener(callback):
-    """Listens for mouse clicks and calls the callback when it catches one.
-
-    This is meant to be run in a thread.
-    """
-    # left button down = 0 or 1. button up = -127 or -128
-    left_state = win32api.GetKeyState(0x01)
-    # right button down = 0 or 1. button up = -127 or -128
-    right_state = win32api.GetKeyState(0x02)
-
-    while True:
-        left_current = win32api.GetKeyState(0x01)
-        right_current = win32api.GetKeyState(0x02)
-
-        if left_current != left_state:  # button state changed
-            left_state = left_current
-            callback()
-
-        if right_current != right_state:  # button state changed
-            right_state = right_current
-            callback()
-
-        time.sleep(0.001)
-
-
 def get_idle_time():
     """Gets the time in seconds since last idle"""
     return (win32api.GetTickCount() - win32api.GetLastInputInfo()) / 1000.0
