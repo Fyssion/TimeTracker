@@ -37,7 +37,6 @@ import queue
 import sys
 
 import psutil
-import pynput
 
 from models import session, Program, TimeEntry
 import utils
