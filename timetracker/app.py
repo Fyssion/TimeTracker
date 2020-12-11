@@ -21,6 +21,8 @@ class Application(tk.Frame):
         tk.Frame.__init__(self, master)
         log.info("Initiating Application...")
 
+        master.protocol("WM_DELETE_WINDOW", self.destroy_gui)
+
         # check if a data folder exists
         if not os.path.exists("data"):
             log.info("data dir not found, creating...")
