@@ -26,18 +26,28 @@ SOFTWARE.
 import tkinter as tk
 import argparse
 import logging
+from logging.handlers import RotatingFileHandler
 import sys
 
 
 from app import Application
 import utils
 
-
+max_bytes = 32 * 1024 * 1024  # 32 MiB
 log = logging.getLogger("timetracker")
 log.setLevel(logging.INFO)
-handler = logging.StreamHandler()
+sh = logging.StreamHandler()
+handler = RotatingFileHandler(
+    filename="timetracker.log",
+    encoding="utf-8",
+    mode="w",
+    maxBytes=max_bytes,
+    backupCount=5,
+)
 fmt = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+sh.setFormatter(fmt)
 handler.setFormatter(fmt)
+log.addHandler(sh)
 log.addHandler(handler)
 
 
