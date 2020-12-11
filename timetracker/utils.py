@@ -29,6 +29,8 @@ import psutil
 import win32api
 import time
 import os
+import multiprocessing.connection
+import logging
 
 
 def check_pid():
@@ -41,7 +43,7 @@ def check_pid():
 
     if not os.path.isfile(filename):
         write_pid()
-        return True
+        return False
 
     with open(filename, "r") as f:
         other_pid = int(f.read())
@@ -54,7 +56,7 @@ def check_pid():
         # process existed but is no longer running
         # replace old pid with our new one
         write_pid()
-        return True
+        return False
 
 
 def top_level_windows(pid):
@@ -137,3 +139,46 @@ def get_all_processes():
 def get_idle_time():
     """Gets the time in seconds since last idle"""
     return (win32api.GetTickCount() - win32api.GetLastInputInfo()) / 1000.0
+
+
+def multiprocess_listener(callback, message="open_gui"):
+    """Listen for messages from other processes
+
+    This is used for opening the GUI.
+    """
+    log = logging.getLogger("timetracker.listener")
+
+    address = ("localhost", 8320)  # family is deduced to be 'AF_INET'
+    listener = multiprocessing.connection.Listener(address, authkey=b"hello_world")
+
+    while True:
+        conn = listener.accept()
+        log.info(f"Connection accepted from {listener.last_accepted}")
+
+        while True:
+            msg = conn.recv()
+
+            if msg == message:
+                log.info(
+                    f"Connection {listener.last_accepted} requested the GUI to be opened"
+                )
+                callback()
+
+            elif msg == "close":
+                log.info(f"Connection {listener.last_accepted} is closing the connection")
+                conn.close()
+                break
+
+    listener.close()
+
+
+def multiprocess_sender(msg="open_gui"):
+    """Send a message to another process.
+
+    See :func:`multiprocess_listener`
+    """
+    address = ("localhost", 8320)
+    conn = multiprocessing.connection.Client(address, authkey=b"hello_world")
+    conn.send(msg)
+    conn.send("close")
+    conn.close()

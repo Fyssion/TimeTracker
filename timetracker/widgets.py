@@ -10,7 +10,7 @@ import utils
 class AddProgramDisplay(tk.Toplevel):
     """A popup that lets you add a new program to track"""
     def __init__(self, master=None):
-        tk.TopLevel.__init__(self, master)
+        tk.Toplevel.__init__(self, master)
 
         self.title("Add a Program")
 
@@ -60,7 +60,7 @@ class AddProgramDisplay(tk.Toplevel):
 
         to_add = Program(name=name, process_name=program.name(), location=program.exe())
         session.add(to_add)
-        session.commit
+        session.commit()
 
         self.destroy()
 
@@ -80,9 +80,11 @@ class ProgramTimeDisplay(tk.StringVar):
 
     def update_time(self):
         """Update itself to the most recent time"""
+        # if we're paused, we don't need to add anything to the timedelta
         if not self.current_time:
             final_timedelta = self.timedelta
 
+        # if we aren't paused, we need to add the time since start to the timedelta
         else:
             since = datetime.datetime.utcnow() - self.current_time
             final_timedelta = self.timedelta + since
@@ -96,21 +98,64 @@ class ProgramTimeDisplay(tk.StringVar):
         )
 
 
+class ProgramTime:
+    def __init__(self, program, timedelta, current_time):
+        self.program = program
+        self.timedelta = timedelta
+        self.current_time = current_time
+        self.final_timedelta = None
+
+
 class ProgramListDisplay(tk.StringVar):
     """A StingVar that displays the user's list of programs"""
-    def __init__(self):
+    def __init__(self, program_times):
         tk.StringVar.__init__(self)
         self.set("Loading programs...")
+        self.program_times = program_times
 
-    def update_programs(self, programs):
+    def update_attrs(self, program_times):
+        """Easy way to update attrs"""
+        self.program_times = program_times
+
+    def resolve_timedelta(self, timedelta, current_time):
+        """Calculate the timedelta based on the current time"""
+        if not current_time:
+            final_timedelta = timedelta
+
+        else:
+            since = datetime.datetime.utcnow() - current_time
+            final_timedelta = timedelta + since
+
+        return final_timedelta
+
+    def generate_program_time(self, timedelta):
+        """Generate a time string"""
+        hours = timedelta.seconds // 3600
+        minutes = (timedelta.seconds // 60) % 60
+        seconds = timedelta.seconds - (minutes * 60) - (hours * 3600)
+
+        return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+
+    def update_programs(self):
         """Update the StringVar with a new set of programs"""
         results = []
 
-        for program in programs:
-            results.append(f"- {program.name} ({program.process_name})")
+        def edit_timedelta(p):
+            final_timedelta = self.resolve_timedelta(p.timedelta, p.current_time)
+            p.final_timedelta = final_timedelta
+            return p
+
+        program_times = [edit_timedelta(p) for p in self.program_times]
+        program_times.sort(key=lambda p: p.timedelta, reverse=True)
+
+        for i, program_time in enumerate(program_times):
+            program = program_time.program
+            timedelta = program_time.final_timedelta
+            delta = self.generate_program_time(timedelta)
+            results.append(f"{i+1}. {program.name} - {delta}")
 
         if not results:
-            self.set("No programs added. Add one to begin tracking!")
+            self.set("No programs added. Add some to begin tracking!")
 
         else:
             self.set("\n".join(results))
@@ -162,8 +207,8 @@ class MainDisplay(tk.Frame):
         self.program_header.grid(column=0, row=3, sticky=tk.W, padx=20, pady=(10, 2))
 
         # Actual list of programs
-        self.programs_var = ProgramListDisplay()
-        self.programs_var.update_programs(master.programs)
+        self.programs_var = ProgramListDisplay(self.get_program_times(entries))
+        self.programs_var.update_programs()
 
         self.program_list_label = tk.Label(self, font=tk_font.Font(size=11), justify=tk.LEFT)
         self.program_list_label.grid(column=0, row=4, sticky=tk.W, padx=20, pady=2)
@@ -176,7 +221,7 @@ class MainDisplay(tk.Frame):
         self.add_program_button.grid(column=0, row=5, sticky=tk.W, padx=20, pady=10)
 
         # Quit button
-        self.quit_button = tk.Button(self, text="Quit", command=master.master.destroy)
+        self.quit_button = tk.Button(self, text="Quit", command=master.destroy_gui)
         self.quit_button.grid(column=1, row=5, sticky=tk.W, padx=20, pady=20)
 
         # for child in self.winfo_children():
@@ -186,8 +231,20 @@ class MainDisplay(tk.Frame):
 
     def add_program(self):
         """Opens a new window where you can add a program to track"""
-        AddProgramDisplay(self)
+        popup = AddProgramDisplay(self)
+        self.wait_window(popup)
+        self.master.load_programs()
         self.programs_var.update_programs(self.master.programs)
+
+    def get_program_times(self, all_entries):
+        """Generates a list of :class:`ProgramTime`s to be used in the :class:`ProgramListDisplay"""
+        program_times = []
+
+        for program in self.master.programs:
+            timedelta, current_time = self.calculate_timedelta(all_entries, program_id=program.id)
+            program_times.append(ProgramTime(program, timedelta, current_time))
+
+        return program_times
 
     def calculate_timedelta(self, all_entries, program_id=None):
         """Calculates a timedelta for a given program or all programs if None is passed"""
@@ -241,16 +298,20 @@ class MainDisplay(tk.Frame):
             entries = self.get_todays_time_entries()
             self.main_time.update_attrs(*self.calculate_timedelta(entries))
             self.main_time.update_time()
+            self.programs_var.update_attrs(self.get_program_times(entries))
+            self.programs_var.update_programs()
             self.counting_program_id = self.master.current_program.id
             self.is_paused = False
             self.status.set(f"Tracking {self.master.current_program.name}")
 
         # if the counter isn't paused and the current program doesn't exist,
-        # then the logging and stopped and the counter should too
+        # then the logging stopped and the counter should too
         elif not self.is_paused and not self.master.current_program:
             entries = self.get_todays_time_entries()
             self.main_time.update_attrs(*self.calculate_timedelta(entries))
             self.main_time.update_time()
+            self.programs_var.update_attrs(self.get_program_times(entries))
+            self.programs_var.update_programs()
             self.is_paused = True
             self.counting_program_id = None
             self.status.set("Currently Paused")
@@ -259,6 +320,7 @@ class MainDisplay(tk.Frame):
         # counting, then just update the time again because nothing has changed
         elif not self.is_paused and self.master.current_program.id == self.counting_program_id:
             self.main_time.update_time()
+            self.programs_var.update_programs()
 
         # finally, if the counter isn't paused and the current program doesn't match
         # the program we're currently counting, then the program has changed since
@@ -267,6 +329,8 @@ class MainDisplay(tk.Frame):
             entries = self.get_todays_time_entries()
             self.main_time.update_attrs(*self.calculate_timedelta(entries))
             self.main_time.update_time()
+            self.programs_var.update_attrs(self.get_program_times(entries))
+            self.programs_var.update_programs()
             self.counting_program_id = self.master.current_program.id
 
         self.after(1000, self.counter_loop)

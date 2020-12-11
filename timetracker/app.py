@@ -5,12 +5,13 @@ import time
 import threading
 import queue
 import logging
+import functools
 
 from widgets import MainDisplay
 from models import session, Program, TimeEntry
 import utils
 
-log = logging.getLogger(__name__)
+log = logging.getLogger("timetracker.app")
 
 
 class Application(tk.Frame):
@@ -18,11 +19,11 @@ class Application(tk.Frame):
 
     def __init__(self, master, no_gui):
         tk.Frame.__init__(self, master)
-        log.info("Initiating Application")
+        log.info("Initiating Application...")
 
         # check if a data folder exists
         if not os.path.exists("data"):
-            log.info("data dir not found, creating")
+            log.info("data dir not found, creating...")
             os.makedirs("data")
 
         # TODO: make more things that you can configure (theme for example)
@@ -30,22 +31,22 @@ class Application(tk.Frame):
 
         # check if a data/config file exists
         if not os.path.isfile("data/config.json"):
-            log.info("config file not found, creating")
+            log.info("config file not found, creating...")
             with open("data/config.json", "w") as f:
                 json.dump(default_config, f, indent=4, sort_keys=True)
                 self.config = default_config
 
         else:
-            log.info("Opening config file")
+            log.info("Opening config file...")
             with open("data/config.json", "r") as f:
                 self.config = json.load(f)
 
-        log.info("Loading programs from db")
+        log.info("Loading programs from db...")
         self.load_programs()
 
-        log.info("Deleting unfinished time entries")
+        log.info("Deleting unfinished time entries...")
         TimeEntry.delete_unfinished_entries()
-        log.info("Starting activity loop")
+        log.info("Starting activity loop...")
 
         # create a queue for running functions in the main thread from
         # other threads
@@ -60,10 +61,40 @@ class Application(tk.Frame):
         self.activity_thread.daemon = True  # close the thread when the app is destroyed
         self.activity_thread.start()
 
+        # create the multiprocess listener
+        partial = functools.partial(self.submit_to_queue, self.start_gui)
+        self.multiprocess_listener = threading.Thread(target=utils.multiprocess_listener, args=(partial,))
+        self.multiprocess_listener.daemon = True  # close the thread when the app is destroyed
+        self.multiprocess_listener.start()
+
+        self.main_display = None
+
         if not no_gui:
-            log.info("Registering MainDisplay")
-            self.main_display = MainDisplay(self)
-            self.main_display.grid(column=0, row=0, sticky=(tk.N, tk.W, tk.E, tk.S))
+            self.start_gui()
+
+    def start_gui(self):
+        """Registers and starts the GUI"""
+        log.info("Registering MainDisplay...")
+
+        self.master.deiconify()
+
+        if self.main_display:
+            log.info("MainDisplay is already registered, aborting...")
+            # TODO: make already open window appear in front
+            return
+
+        self.main_display = MainDisplay(self)
+        self.main_display.grid(column=0, row=0, sticky=(tk.N, tk.W, tk.E, tk.S))
+
+    def destroy_gui(self):
+        log.info("Destroying MainDisplay...")
+
+        if not self.main_display:
+            raise RuntimeError("No GUI to destroy!")
+
+        self.main_display.destroy()
+        self.master.withdraw()
+        self.main_display = None
 
     def load_programs(self):
         """Load all the user's programs into memory for tracking"""

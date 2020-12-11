@@ -33,21 +33,32 @@ from app import Application
 import utils
 
 
-log = logging.getLogger(__name__)
+log = logging.getLogger("timetracker")
 log.setLevel(logging.INFO)
-log.addHandler(logging.StreamHandler())
+handler = logging.StreamHandler()
+fmt = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+handler.setFormatter(fmt)
+log.addHandler(handler)
 
 
 def main():
-    log.info("Starting app")
+    log.info("Starting app...")
+
     other_proc = utils.check_pid()
-    if not other_proc:
-        # TODO: I need to somehow start the GUI for the running process
-        # right now it just ends which isn't great
-        log.info("Another instance is running, exiting")
+    if other_proc:
+        log.info("Another instance is running, requesting it to open its GUI...")
+        try:
+            utils.multiprocess_sender()
+
+        except Exception:
+            log.info("Message failed to send. Uh oh. Exiting anyways...")
+
+        else:
+            log.info("Sent message. Hopefully it worked? Exiting...")
+
         return
 
-    log.info("Parsing args")
+    log.info("Parsing args...")
     # parse CLI args
     parser = argparse.ArgumentParser(
         description="Time Tracker: A Windows app written in Python that tracks your time for specified apps"
@@ -57,16 +68,21 @@ def main():
     )
     args = parser.parse_args()
 
-    log.info("Setting up Tk")
+    log.info("Setting up Tk...")
     # setup and start the tkinter root
     root = tk.Tk()
     root.title("Time Tracker")
+    root.iconbitmap("icon.ico")
     root.resizable(width=False, height=False)
+
     Application(root, args.no_gui).grid(column=0, row=0)
+
     if args.no_gui:
         root.withdraw()
-    log.info("Starting mainloop")
+
+    log.info("Starting mainloop...")
     root.mainloop()
+
     log.info("Exiting...")
     sys.exit()
 
