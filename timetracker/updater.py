@@ -26,7 +26,6 @@ import os
 import json
 import sys
 import subprocess
-import enum
 import urllib.request
 import collections
 import logging
@@ -38,29 +37,7 @@ from widgets import YesNoPrompt
 log = logging.getLogger("timetracker.updater")
 
 
-class UpdateResponse(enum.Enum):
-    SUCCESS = 0
-    DEPS_FAILED = 1
-    GIT_PULL_FAILED = 2
-
-
 VersionInfo = collections.namedtuple("VersionInfo", "major minor micro releaselevel serial")
-
-
-def update_deps():
-    """Update the deps with pip"""
-    print("Attempting to update dependencies...")
-
-    try:
-        subprocess.check_call(
-            f'"{sys.executable}" -m pip install --no-warn-script-location --user -U -r requirements.txt',
-            shell=True,
-        )
-    except subprocess.CalledProcessError:
-        raise OSError(
-            "Could not update dependencies. "
-            f"You will need to run '\"{sys.executable}\" -m pip install -U -r requirements.txt' yourself."
-        )
 
 
 def check_for_updates():
@@ -179,32 +156,3 @@ def updater_loop(root):
     while True:
         perform_update(root)
         time.sleep(86400)  # 24h
-
-
-def inital_setup():
-    """Run the initial setup for the app
-
-    This installs the deps and makes the config files/dirs"""
-    try:
-        update_deps()
-    except OSError as e:
-        print(str(e))
-        return UpdateResponse.DEPS_FAILED
-
-    # check if a data folder exists
-    if not os.path.exists("data"):
-        print("data dir not found, creating...")
-        os.makedir("data")
-
-    # TODO: make more things that you can configure (theme for example)
-    default_config = {"mouse_timeout": 10}
-
-    # check if a data/config file exists
-    if not os.path.isfile("data/config.json"):
-        print("config file not found, creating...")
-        with open("data/config.json", "w") as f:
-            json.dump(default_config, f, indent=4, sort_keys=True)
-
-    # TODO: add program to start menu and startup programs
-
-    print("Done! You may now run the program.")
