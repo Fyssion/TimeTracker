@@ -28,8 +28,8 @@ from tkinter import ttk
 import tkinter.font as tk_font
 import datetime
 
-from .models import session, Program, TimeEntry
-from . import utils
+from models import session, Program, TimeEntry
+import utils
 
 
 class YesNoPrompt(tk.Toplevel):

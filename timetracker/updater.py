@@ -32,7 +32,7 @@ import collections
 import logging
 import time
 
-from .widgets import YesNoPrompt
+from widgets import YesNoPrompt
 
 
 log = logging.getLogger("timetracker.updater")
