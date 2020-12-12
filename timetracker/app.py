@@ -52,7 +52,7 @@ class Application(tk.Frame):
         # check if a data folder exists
         if not os.path.exists("data"):
             log.info("data dir not found, creating...")
-            os.makedirs("data")
+            os.mkdir("data")
 
         # TODO: make more things that you can configure (theme for example)
         default_config = {"mouse_timeout": 10}

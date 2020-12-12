@@ -34,7 +34,7 @@ from sqlalchemy.orm import relationship, sessionmaker
 # need this or program will crash since sqlalchemy
 # doesn't create the folder for me (only the file)
 if not os.path.isdir("data"):
-    os.makedir("data")
+    os.mkdir("data")
 
 
 # Using an SQLite db for logging times
