@@ -43,7 +43,7 @@ VersionInfo = collections.namedtuple("VersionInfo", "major minor micro releasele
 def check_for_updates():
     """Request the latest release from GitHub and check it with the current version"""
     try:
-        with urllib.request.urlopen("https://github.com/api/v3/repos/Fyssion/TimeTracker/tags") as response:
+        with urllib.request.urlopen("https://api.github.com/repos/Fyssion/TimeTracker/tags") as response:
             raw = response.read()
 
         tags = json.loads(raw)
@@ -127,6 +127,7 @@ def perform_update(root, restart=True):
     """
     log.info("Checking for updates...")
     if not check_for_updates():
+        log.info("No updates needed.")
         return
 
     log.info("Prompting user about update...")

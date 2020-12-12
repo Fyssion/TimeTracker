@@ -97,6 +97,7 @@ def main():
     root.resizable(width=False, height=False)
 
     if args.update:
+        root.withdraw()
         log.info("Update arg specified, performing update...")
         updater.perform_update(root, restart=False)
         return
