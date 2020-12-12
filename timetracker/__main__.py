@@ -22,6 +22,13 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+try:
+    import sqlalchemy
+except ImportError:
+    print("Cannot run. Please run 'setup.bat' before continuing.")
+    import sys
+    sys.exit()
+
 
 import tkinter as tk
 import argparse
@@ -29,9 +36,10 @@ import logging
 from logging.handlers import RotatingFileHandler
 import sys
 
-
-from app import Application
 import utils
+from app import Application
+import updater
+
 
 max_bytes = 32 * 1024 * 1024  # 32 MiB
 log = logging.getLogger("timetracker")
@@ -76,6 +84,9 @@ def main():
     parser.add_argument(
         "--no-gui", help="A flag that disables the GUI on start", action="store_true"
     )
+    parser.add_argument(
+        "--update", "-U", help="A flag that updates the app", action="store_true"
+    )
     args = parser.parse_args()
 
     log.info("Setting up Tk...")
@@ -84,6 +95,11 @@ def main():
     root.title("Time Tracker")
     root.iconbitmap("icon.ico")
     root.resizable(width=False, height=False)
+
+    if args.update:
+        log.info("Update arg specified, performing update...")
+        updater.perform_update(root, restart=False)
+        return
 
     Application(root, args.no_gui).grid(column=0, row=0)
 

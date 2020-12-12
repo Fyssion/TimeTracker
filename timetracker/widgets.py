@@ -5,6 +5,30 @@ import datetime
 
 from models import session, Program, TimeEntry
 import utils
+class YesNoPrompt(tk.Toplevel):
+    def __init__(self, master=None, question=None):
+        tk.Toplevel.__init__(self, master)
+
+        self.result = None
+
+        self.title("Update TimeTracker")
+
+        header = tk.Label(self, text=question)
+        header.grid(column=0, row=0, sticky=tk.W, padx=20, pady=5)
+
+        yes_button = tk.Button(self, text="Yes", command=self.yes)
+        yes_button.grid(column=0, row=1, sticky=tk.W, padx=(20, 5), pady=5)
+
+        no_button = tk.Button(self, text="No", command=self.no)
+        no_button.grid(column=0, row=1, sticky=tk.E, padx=(5, 20), pady=5)
+
+    def yes(self):
+        self.result = True
+        self.destroy()
+
+    def no(self):
+        self.result = False
+        self.destroy()
 
 
 class AddProgramDisplay(tk.Toplevel):

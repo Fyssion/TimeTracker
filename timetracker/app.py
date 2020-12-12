@@ -10,6 +10,7 @@ import functools
 from widgets import MainDisplay
 from models import session, Program, TimeEntry
 import utils
+import updater
 
 log = logging.getLogger("timetracker.app")
 
@@ -68,6 +69,11 @@ class Application(tk.Frame):
         self.multiprocess_listener = threading.Thread(target=utils.multiprocess_listener, args=(partial,))
         self.multiprocess_listener.daemon = True  # close the thread when the app is destroyed
         self.multiprocess_listener.start()
+
+        # create the updater loop
+        self.updater_thread = threading.Thread(target=updater.updater_loop, args=(master,))
+        self.updater_thread.daemon = True  # close the thread when the app is destroyed
+        self.updater_thread.start()
 
         self.main_display = None
 
