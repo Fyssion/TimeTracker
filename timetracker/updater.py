@@ -68,9 +68,9 @@ def check_for_updates():
     version.append(releaselevel)
     version.append(0)
 
-    other_version = VersionInfo(**version)
+    other_version = VersionInfo(*version)
 
-    from . import version_info as my_version
+    from __init__ import version_info as my_version
 
     if other_version > my_version:
         return True
@@ -127,7 +127,6 @@ def perform_update(root, restart=True):
     """
     log.info("Checking for updates...")
     if not check_for_updates():
-        log.info("No updates needed.")
         return
 
     log.info("Prompting user about update...")
@@ -151,9 +150,3 @@ def perform_update(root, restart=True):
     if restart:
         log.info("Restarting app...")
         restart_app()
-
-
-def updater_loop(root):
-    while True:
-        perform_update(root)
-        time.sleep(86400)  # 24h

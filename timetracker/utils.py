@@ -182,3 +182,10 @@ def multiprocess_sender(msg="open_gui"):
     conn.send(msg)
     conn.send("close")
     conn.close()
+
+
+def loop(seconds, callback):
+    """Call a function every x seconds"""
+    while True:
+        callback()
+        time.sleep(seconds)

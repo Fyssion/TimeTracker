@@ -95,8 +95,12 @@ class Application(tk.Frame):
         self.multiprocess_listener.daemon = True  # close the thread when the app is destroyed
         self.multiprocess_listener.start()
 
-        # create the updater loop
-        self.updater_thread = threading.Thread(target=updater.updater_loop, args=(master,))
+        # create the updater loop that runs every 24 hours
+        # double partial because we need to submit a function to the queue.
+        # both have params
+        partial = functools.partial(updater.perform_update, master)
+        callback = functools.partial(self.submit_to_queue, partial)
+        self.updater_thread = threading.Thread(target=utils.loop, args=(86400, callback))
         self.updater_thread.daemon = True  # close the thread when the app is destroyed
         self.updater_thread.start()
 
