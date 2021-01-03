@@ -62,19 +62,30 @@ log.addHandler(handler)
 def main():
     log.info("Starting app...")
 
-    other_proc = utils.check_pid()
-    if other_proc:
+    other_proc = utils.is_already_running()
+
+    if not other_proc:
+        log.info("Instance check passed")
+
+    else:
         log.info("Another instance is running, requesting it to open its GUI...")
         try:
             utils.multiprocess_sender()
+            log.info("Sent message. Hopefully it worked? Exiting...")
+            return
 
         except Exception:
-            log.info("Message failed to send. Uh oh. Exiting anyways...")
+            log.info("Message failed to send. Uh oh. Attempting to kill other process...")
 
-        else:
-            log.info("Sent message. Hopefully it worked? Exiting...")
+            try:
+                other_proc.kill()
+            except Exception:
+                log.info("Failed to kill other process. Writing to lockfile and continuing with startup...")
+                utils.write_pid()
 
-        return
+            else:
+                log.info("Successfully killed other process. Writing to lockfile and continuing with startup...")
+                utils.write_pid()
 
     log.info("Parsing args...")
     # parse CLI args
@@ -109,6 +120,15 @@ def main():
 
     log.info("Starting mainloop...")
     root.mainloop()
+
+    log.info("Deleting lockfile...")
+    try:
+        result = utils.delete_lockfile()
+        if not result:
+            log.info("Lockfile does not exist, skipping deletion")
+
+    except Exception:
+        log.info("Failed to delete lockfile")
 
     log.info("Exiting...")
     sys.exit()

@@ -28,24 +28,27 @@ import win32gui
 import psutil
 import win32api
 import time
-import os
+import os.path
 import multiprocessing.connection
 import logging
+import tempfile
+
+LOCKFILE = os.path.normpath(tempfile.gettempdir() + '/timetracker_instance.lock')
 
 
-def check_pid():
+def write_pid():
+    """Writes the app's PID to the lockfile"""
+    with open(LOCKFILE, "w") as f:
+        f.write(str(os.getpid()))
+
+
+def is_already_running():
     """Checks if another instance of the app is running"""
-    filename = "instance_lock.txt"
-
-    def write_pid():
-        with open(filename, "w") as f:
-            f.write(str(os.getpid()))
-
-    if not os.path.isfile(filename):
+    if not os.path.isfile(LOCKFILE):
         write_pid()
         return False
 
-    with open(filename, "r") as f:
+    with open(LOCKFILE, "r") as f:
         other_pid = int(f.read())
 
     try:
@@ -57,6 +60,13 @@ def check_pid():
         # replace old pid with our new one
         write_pid()
         return False
+
+
+def delete_lockfile():
+    """Deletes the lockfile if it exists"""
+    if os.path.isfile(LOCKFILE):
+        os.remove(LOCKFILE)
+        return True
 
 
 def top_level_windows(pid):
