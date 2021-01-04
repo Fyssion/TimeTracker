@@ -58,8 +58,22 @@ class YesNoPrompt(tk.Toplevel):
         self.destroy()
 
 
+class InfoBox(tk.Toplevel):
+    def __init__(self, master, title, text):
+        tk.Toplevel.__init__(self, master)
+
+        self.title(title)
+
+        label = tk.Label(self, text=text)
+        label.pack()
+
+        back_button = tk.Button(self, text="OK", command=self.destroy)
+        back_button.pack()
+
+
 class AddProgramDisplay(tk.Toplevel):
     """A popup that lets you add a new program to track"""
+
     def __init__(self, master=None):
         tk.Toplevel.__init__(self, master)
 
@@ -85,7 +99,9 @@ class AddProgramDisplay(tk.Toplevel):
         dropdown_var = tk.StringVar()
         dropdown_var.set(sorted_keys[0])
 
-        self.dropdown = ttk.Combobox(self, textvariable=dropdown_var, values=sorted_keys)
+        self.dropdown = ttk.Combobox(
+            self, textvariable=dropdown_var, values=sorted_keys
+        )
         self.dropdown.pack()
 
         save_button = tk.Button(self, text="Save", command=self.save_to_db)
@@ -111,6 +127,50 @@ class AddProgramDisplay(tk.Toplevel):
 
         to_add = Program(name=name, process_name=program.name(), location=program.exe())
         session.add(to_add)
+        session.commit()
+
+        self.destroy()
+
+
+class RemoveProgramDisplay(tk.Toplevel):
+    def __init__(self, master):
+        tk.Toplevel.__init__(self, master)
+
+        self.title("Remove a Program")
+
+        # name your program text
+        warn_text = tk.Message(self, text="Select a program to remove\nTHIS DELETES ALL TIME RECORDED FOR THAT PROGRAM!")
+        warn_text.pack()
+
+        programs = self.master.master.programs
+        self.programs_map = {p.name: p for p in programs}
+        program_names = list(self.programs_map.keys())
+
+        # make the dropdown
+        dropdown_var = tk.StringVar()
+        dropdown_var.set(program_names[0])
+
+        self.dropdown = ttk.Combobox(
+            self, textvariable=dropdown_var, values=program_names
+        )
+        self.dropdown.pack()
+
+        remove_button = tk.Button(self, text="Remove", command=self.save_to_db)
+        remove_button.pack()
+
+        cancel_button = tk.Button(self, text="Cancel", command=self.destroy)
+        cancel_button.pack()
+
+    def save_to_db(self):
+        option = self.dropdown.get()
+
+        try:
+            program = self.programs_map[option]
+        except KeyError:
+            # TODO: error maybe
+            return
+
+        session.delete(program)
         session.commit()
 
         self.destroy()
@@ -144,9 +204,7 @@ class ProgramTimeDisplay(tk.StringVar):
         minutes = (final_timedelta.seconds // 60) % 60
         seconds = final_timedelta.seconds - (minutes * 60) - (hours * 3600)
 
-        self.set(
-            f"{hours:02d}:{minutes:02d}:{seconds:02d}"
-        )
+        self.set(f"{hours:02d}:{minutes:02d}:{seconds:02d}")
 
 
 class ProgramTime:
@@ -159,6 +217,7 @@ class ProgramTime:
 
 class ProgramListDisplay(tk.StringVar):
     """A StingVar that displays the user's list of programs"""
+
     def __init__(self, program_times):
         tk.StringVar.__init__(self)
         self.set("Loading programs...")
@@ -212,6 +271,45 @@ class ProgramListDisplay(tk.StringVar):
             self.set("\n".join(results))
 
 
+class AboutToplevel(tk.Toplevel):
+    def __init__(self, master):
+        tk.Toplevel.__init__(self, master)
+
+        header_font = tk_font.Font(size=16)
+
+        header = tk.Label(self, text="About TimeTracker", font=header_font)
+        header.pack()
+
+        text = (
+            "TimeTracker is open source.\n"
+            "The source code is hosted on GitHub at Fyssion/TimeTracker.\n\n"
+            "TimeTracker is maintained by Fyssion.\n"
+            "TimeTracker is licensed under the MIT license."
+        )
+        text_label = tk.Label(self, text=text)
+        text_label.pack()
+
+        back_button = tk.Button(self, text="Back", command=self.destroy)
+        back_button.pack()
+
+
+class MenuBar(tk.Menu):
+    def __init__(self, master):
+        tk.Menu.__init__(self, master)
+
+        self.filemenu = fm = tk.Menu(self, tearoff=0)
+        fm.add_command(label="Add Program", command=self.master.add_program)
+        fm.add_command(label="Remove Program", command=self.master.remove_program)
+        fm.insert_separator(2)
+        fm.add_command(label="Stop App", command=self.master.stop_app)
+        self.add_cascade(label="File", menu=fm)
+
+        self.helpmenu = hm = tk.Menu(self, tearoff=0)
+        hm.add_command(label="About", command=self.master.open_about_window)
+        hm.add_command(label="Check For Updates", command=self.master.check_for_updates)
+        self.add_cascade(label="Help", menu=hm)
+
+
 class MainDisplay(tk.Frame):
     """Main display that greets the user upon opening
 
@@ -220,6 +318,10 @@ class MainDisplay(tk.Frame):
 
     def __init__(self, master):
         tk.Frame.__init__(self, master)
+
+        # Create the MenuBar
+        self.menubar = MenuBar(self)
+        self.master.master.config(menu=self.menubar)
 
         self.last_checked = None
         entries = self.get_todays_time_entries()
@@ -233,9 +335,9 @@ class MainDisplay(tk.Frame):
             else "Currently Paused"
         )
 
-        header_font = tk_font.Font(size=16)
-
         # == Main counter section ==
+
+        header_font = tk_font.Font(size=16)
 
         # Create status label
         self.status_label = tk.Label(self, font=header_font)
@@ -261,19 +363,15 @@ class MainDisplay(tk.Frame):
         self.programs_var = ProgramListDisplay(self.get_program_times(entries))
         self.programs_var.update_programs()
 
-        self.program_list_label = tk.Label(self, font=tk_font.Font(size=11), justify=tk.LEFT)
+        self.program_list_label = tk.Label(
+            self, font=tk_font.Font(size=11), justify=tk.LEFT
+        )
         self.program_list_label.grid(column=0, row=4, sticky=tk.W, padx=20, pady=2)
         self.program_list_label["textvariable"] = self.programs_var
 
-        # Add Program button
-        self.add_program_button = tk.Button(
-            self, text="Add Program", command=self.add_program
-        )
-        self.add_program_button.grid(column=0, row=5, sticky=tk.W, padx=20, pady=10)
-
         # Quit button
         self.quit_button = tk.Button(self, text="Quit", command=master.destroy_gui)
-        self.quit_button.grid(column=1, row=5, sticky=tk.W, padx=20, pady=20)
+        self.quit_button.grid(column=0, row=5, sticky=(tk.E, tk.N), padx=20, pady=20)
 
         # for child in self.winfo_children():
         #     child.grid_configure(padx=20, pady=20)
@@ -285,14 +383,53 @@ class MainDisplay(tk.Frame):
         popup = AddProgramDisplay(self)
         self.wait_window(popup)
         self.master.load_programs()
-        self.programs_var.update_programs(self.master.programs)
+        entries = self.get_todays_time_entries()
+        self.main_time.update_attrs(*self.calculate_timedelta(entries))
+        self.main_time.update_time()
+        self.programs_var.update_attrs(self.get_program_times(entries))
+        self.programs_var.update_programs()
+
+    def remove_program(self):
+        """Opens a new window where you can remove a program"""
+        popup = RemoveProgramDisplay(self)
+        self.wait_window(popup)
+        self.master.load_programs()
+        entries = self.get_todays_time_entries()
+        self.main_time.update_attrs(*self.calculate_timedelta(entries))
+        self.main_time.update_time()
+        self.programs_var.update_attrs(self.get_program_times(entries))
+        self.programs_var.update_programs()
+
+    def stop_app(self):
+        """Opens a confirmation menu asking if the user really wants to quit"""
+        prompt = YesNoPrompt(
+            self,
+            "Really quit?\nThis will stop program tracking until you open TimeTracker again.",
+        )
+        self.wait_window(prompt)
+
+        if not prompt.result:
+            return
+
+        self.master.master.destroy()
+
+    def open_about_window(self):
+        """Opens the about window"""
+        _ = AboutToplevel(self)
+
+    def check_for_updates(self):
+        """Runs a more interactive updater session"""
+        from updater import perform_update
+        perform_update(self, interactive=True)
 
     def get_program_times(self, all_entries):
         """Generates a list of :class:`ProgramTime`s to be used in the :class:`ProgramListDisplay"""
         program_times = []
 
         for program in self.master.programs:
-            timedelta, current_time = self.calculate_timedelta(all_entries, program_id=program.id)
+            timedelta, current_time = self.calculate_timedelta(
+                all_entries, program_id=program.id
+            )
             program_times.append(ProgramTime(program, timedelta, current_time))
 
         return program_times
@@ -369,14 +506,20 @@ class MainDisplay(tk.Frame):
 
         # if the counter isn't paused and the current program matches the program we're currently
         # counting, then just update the time again because nothing has changed
-        elif not self.is_paused and self.master.current_program.id == self.counting_program_id:
+        elif (
+            not self.is_paused
+            and self.master.current_program.id == self.counting_program_id
+        ):
             self.main_time.update_time()
             self.programs_var.update_programs()
 
         # finally, if the counter isn't paused and the current program doesn't match
         # the program we're currently counting, then the program has changed since
         # the last loop and we need to check the db again
-        elif not self.is_paused and self.master.current_program.id != self.counting_program_id:
+        elif (
+            not self.is_paused
+            and self.master.current_program.id != self.counting_program_id
+        ):
             entries = self.get_todays_time_entries()
             self.main_time.update_attrs(*self.calculate_timedelta(entries))
             self.main_time.update_time()

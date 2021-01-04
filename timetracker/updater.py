@@ -31,7 +31,7 @@ import collections
 import logging
 import time
 
-from widgets import YesNoPrompt
+from widgets import YesNoPrompt, InfoBox
 
 
 log = logging.getLogger("timetracker.updater")
@@ -119,14 +119,19 @@ def restart_app():
     sys.exit()
 
 
-def perform_update(root, restart=True):
+def perform_update(root, restart=True, interactive=False):
     """Perform the full update process
 
     This includes checking for updates, asking the user for confirmation,
     pulling from GitHub, and restarting the app.
     """
-    log.info("Checking for updates...")
+
+    interactive_notice = " (interactive)" if interactive else ""
+    log.info(f"Checking for updates...{interactive_notice}")
     if not check_for_updates():
+        if interactive:
+            _ = InfoBox(root, "TimeTracker Updater", "TimeTracker is already up-to-date!")
+
         return
 
     log.info("Prompting user about update...")
