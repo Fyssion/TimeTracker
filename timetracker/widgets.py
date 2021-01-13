@@ -366,15 +366,8 @@ class MainDisplay(tk.Frame):
         self.program_list_label = tk.Label(
             self, font=tk_font.Font(size=11), justify=tk.LEFT
         )
-        self.program_list_label.grid(column=0, row=4, sticky=tk.W, padx=20, pady=2)
+        self.program_list_label.grid(column=0, row=4, sticky=tk.W, padx=20, pady=(2, 40))
         self.program_list_label["textvariable"] = self.programs_var
-
-        # Quit button
-        self.quit_button = tk.Button(self, text="Quit", command=master.destroy_gui)
-        self.quit_button.grid(column=0, row=5, sticky=(tk.E, tk.N), padx=20, pady=20)
-
-        # for child in self.winfo_children():
-        #     child.grid_configure(padx=20, pady=20)
 
         self.counter_loop()
 
